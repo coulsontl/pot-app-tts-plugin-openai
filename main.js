@@ -1,22 +1,23 @@
 async function tts(text, _lang, options = {}) {
-    const { config, utils } = options;
-    const { http } = utils;
-    const { fetch, Body } = http;
+    const { config } = options;
 
     let { requestPath, apiKey, model, voice, speed } = config;
 
     if (!requestPath) {
         requestPath = "https://api.openai.com";
     }
+
     if (!/https?:\/\/.+/.test(requestPath)) {
         requestPath = `https://${requestPath}`;
     }
-    if (requestPath.endsWith('/')) {
-        requestPath = requestPath.slice(0, -1);
+    const apiUrl = new URL(requestPath);
+
+    // in openai like api, /v1 is not required
+    if (!apiUrl.pathname.endsWith('/audio/speech')) {
+        apiUrl.pathname += apiUrl.pathname.endsWith('/') ? '' : '/';
+        apiUrl.pathname += 'v1/audio/speech';
     }
-    if (!requestPath.endsWith('/audio/speech')) {
-        requestPath += '/v1/audio/speech';
-    }
+
     if (!apiKey) {
         throw "apiKey is required";
     }
@@ -29,30 +30,26 @@ async function tts(text, _lang, options = {}) {
     if (!speed) {
         speed = 1.0;
     }
-    console.log(speed);
-    const res = await fetch(requestPath, {
+
+    const res = await window.fetch(apiUrl.href, {
         method: "POST",
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
         },
-        body: Body.json({
+        body: JSON.stringify({
             model,
             voice,
             speed: parseFloat(speed),
             input: text,
         })
-        , responseType: 3
     });
 
     if (res.ok) {
-        let result = res.data;
-        if (result) {
-            return result;
-        } else {
-            throw JSON.stringify(result);
-        }
+        const audioData = await res.blob();
+        return audioData;
     } else {
-        throw `Http Request Error\nHttp Status: ${res.status}\n${JSON.stringify(res.data)}`;
+        const errorData = await res.text();
+        throw `Http Request Error\nHttp Status: ${res.status}\n${errorData}`;
     }
 }
