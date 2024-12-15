@@ -46,10 +46,24 @@ async function tts(text, _lang, options = {}) {
     });
 
     if (res.ok) {
-        const audioData = await res.blob();
-        return audioData;
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            // 如果返回的是 JSON 格式
+            const result = await res.json();
+            return result;
+        } else {
+            // 如果返回的是二进制音频数据
+            const audioData = await res.arrayBuffer();
+            return audioData;
+        }
     } else {
-        const errorData = await res.text();
-        throw `Http Request Error\nHttp Status: ${res.status}\n${errorData}`;
+        let errorMessage;
+        try {
+            const errorData = await res.json();
+            errorMessage = JSON.stringify(errorData);
+        } catch {
+            errorMessage = await res.text();
+        }
+        throw `Http Request Error\nHttp Status: ${res.status}\n${errorMessage}`;
     }
 }
